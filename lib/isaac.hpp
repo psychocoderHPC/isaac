@@ -56,6 +56,14 @@
 #include <math.h>
 #include <stdio.h>
 
+#define HIP_CHECK(...) \
+do{auto ret = __VA_ARGS__; \
+if(ret != hipSuccess) \
+{ \
+    std::string const sError = (std::string(__FILE__) + "(" + std::to_string(__LINE__) + ") " + " : '" + hipGetErrorName(ret) + "': '" + std::string(hipGetErrorString(ret)) + "'!"); \
+    throw std::runtime_error(sError); \
+}                      \
+}while(false)
 
 namespace isaac
 {
@@ -249,10 +257,12 @@ namespace isaac
                         = {isaac_int(localSize[0]), isaac_int(localSize[1]), isaac_int(localSize[2])};
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
                     if(boost::mpl::not_<boost::is_same<T_Acc, alpaka::AccGpuCudaRt<T_AccDim, ISAAC_IDX_TYPE>>>::value)
+#elif ALPAKA_ACC_GPU_HIP_ENABLED == 1
+                    if(boost::mpl::not_<boost::is_same<T_Acc, alpaka::AccGpuHipRt<T_AccDim, ISAAC_IDX_TYPE>>>::value)
 #endif
                     {
                         gridSize.x = ISAAC_IDX_TYPE(localSize[0] + ISAAC_GUARD_SIZE * 2);
-                        gridSize.y = ISAAC_IDX_TYPE(localSize[0] + ISAAC_GUARD_SIZE * 2);
+                        gridSize.y = ISAAC_IDX_TYPE(localSize[1] + ISAAC_GUARD_SIZE * 2);
                         blockSize.x = ISAAC_IDX_TYPE(1);
                         blockSize.y = ISAAC_IDX_TYPE(1);
                     }
@@ -305,6 +315,8 @@ namespace isaac
                 {
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
                     if(boost::mpl::not_<boost::is_same<T_Acc, alpaka::AccGpuCudaRt<T_AccDim, ISAAC_IDX_TYPE>>>::value)
+#elif ALPAKA_ACC_GPU_HIP_ENABLED == 1
+                    if(boost::mpl::not_<boost::is_same<T_Acc, alpaka::AccGpuHipRt<T_AccDim, ISAAC_IDX_TYPE>>>::value)
 #endif
                     {
                         gridSize = localSize;
@@ -385,6 +397,8 @@ namespace isaac
                 {
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
                     if(boost::mpl::not_<boost::is_same<T_Acc, alpaka::AccGpuCudaRt<T_AccDim, ISAAC_IDX_TYPE>>>::value)
+#elif ALPAKA_ACC_GPU_HIP_ENABLED == 1
+                    if(boost::mpl::not_<boost::is_same<T_Acc, alpaka::AccGpuHipRt<T_AccDim, ISAAC_IDX_TYPE>>>::value)
 #endif
                     {
                         gridSize = localSize;
@@ -781,14 +795,23 @@ namespace isaac
             // copy ssao kernel to constant memory
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const ssaoKernelDeviceExtent(ISAAC_IDX_TYPE(64));
 
-            auto ssaoKernelDeviceView(
-                alpaka::createStaticDevMemView(&SSAOKernelArray[0u], acc, ssaoKernelDeviceExtent));
+            int *symbolAddress;
+            HIP_CHECK(hipGetSymbolAddress((void**) &symbolAddress, HIP_SYMBOL(SSAOKernelArray)));
+           // auto ssaoKernelDeviceView(
+           // alpaka::createStaticDevMemView(&SSAOKernelArray[0u], acc, ssaoKernelDeviceExtent));
+            auto ssaoKernelDeviceView
+                = alpaka::ViewPlainPtr<DevAcc, isaac_float3, alpaka::DimInt<1u>, ISAAC_IDX_TYPE>((isaac_float3*)symbolAddress, acc, ssaoKernelDeviceExtent);
+
             alpaka::memcpy(stream, ssaoKernelDeviceView, ssaoKernelHostBuf, ISAAC_IDX_TYPE(64));
 
             // copy ssao noise kernel to constant memory
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const ssaoNoiseDeviceExtent(ISAAC_IDX_TYPE(16));
 
-            auto ssaoNoiseDeviceView(alpaka::createStaticDevMemView(&SSAONoiseArray[0u], acc, ssaoNoiseDeviceExtent));
+           // auto ssaoNoiseDeviceView(alpaka::createStaticDevMemView(&SSAONoiseArray[0u], acc, ssaoNoiseDeviceExtent));
+
+            HIP_CHECK(hipGetSymbolAddress((void**) &symbolAddress, HIP_SYMBOL(SSAONoiseArray)));
+            auto ssaoNoiseDeviceView
+                = alpaka::ViewPlainPtr<DevAcc, isaac_float3, alpaka::DimInt<1u>, ISAAC_IDX_TYPE>((isaac_float3*)symbolAddress, acc, ssaoNoiseDeviceExtent);
             alpaka::memcpy(stream, ssaoNoiseDeviceView, ssaoNoiseHostBuf, ISAAC_IDX_TYPE(16));
         }
 
@@ -1052,8 +1075,13 @@ namespace isaac
                     * (boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value))));
 
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const parameterDeviceExtent(ISAAC_IDX_TYPE(16));
-            auto parameterDeviceView(
-                alpaka::createStaticDevMemView(&FunctorParameter[0u], acc, parameterDeviceExtent));
+            //auto parameterDeviceView(
+            //    alpaka::createStaticDevMemView(&FunctorParameter[0u], acc, parameterDeviceExtent));
+            int *symbolAddress;
+            HIP_CHECK(hipGetSymbolAddress((void**) &symbolAddress, HIP_SYMBOL(FunctorParameter)));
+            auto parameterDeviceView
+                = alpaka::ViewPlainPtr<DevAcc, isaac_float4, alpaka::DimInt<1u>, ISAAC_IDX_TYPE>((isaac_float4*)symbolAddress, acc, parameterDeviceExtent);
+
             alpaka::memcpy(
                 stream,
                 parameterDeviceView,
@@ -1088,8 +1116,12 @@ namespace isaac
 
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const functionChainDeviceExtent(
                 ISAAC_IDX_TYPE(ISAAC_MAX_SOURCES));
-            auto functionChainDeviceView(
-                alpaka::createStaticDevMemView(&FunctionChain[0u], acc, functionChainDeviceExtent));
+           // auto functionChainDeviceView(
+            //    alpaka::createStaticDevMemView(&FunctionChain[0u], acc, functionChainDeviceExtent));
+
+            HIP_CHECK(hipGetSymbolAddress((void**) &symbolAddress, HIP_SYMBOL(FunctionChain)));
+            auto functionChainDeviceView
+                = alpaka::ViewPlainPtr<DevAcc, FunctorChainPointerN, alpaka::DimInt<1u>, ISAAC_IDX_TYPE>((FunctorChainPointerN*)symbolAddress, acc, functionChainDeviceExtent);
             alpaka::memcpy(
                 stream,
                 functionChainDeviceView,
@@ -1840,16 +1872,27 @@ namespace isaac
             // inverse matrix
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const inverseMVPDeviceEextent(ISAAC_IDX_TYPE(1));
             // get view
-            auto inverseMVPDeviceView(
-                alpaka::createStaticDevMemView(&InverseMVPMatrix, myself->acc, inverseMVPDeviceEextent));
+            //auto inverseMVPDeviceView(
+            //    alpaka::createStaticDevMemView(&InverseMVPMatrix, myself->acc, inverseMVPDeviceEextent));
+
+            int *symbolAddress;
+            HIP_CHECK(hipGetSymbolAddress((void**) &symbolAddress, HIP_SYMBOL(InverseMVPMatrix)));
+            auto inverseMVPDeviceView
+                = alpaka::ViewPlainPtr<DevAcc, isaac_mat4, alpaka::DimInt<1u>, ISAAC_IDX_TYPE>((isaac_mat4*)symbolAddress, myself->acc, inverseMVPDeviceEextent);
+
             // copy to constant memory
             alpaka::memcpy(myself->stream, inverseMVPDeviceView, inverseMVPHostBuf, ISAAC_IDX_TYPE(1));
 
             // modelview matrix
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const modelviewDeviceExtent(ISAAC_IDX_TYPE(1));
             // get view
-            auto modelviewDeviceView(
-                alpaka::createStaticDevMemView(&ModelViewMatrix, myself->acc, modelviewDeviceExtent));
+            //auto modelviewDeviceView(
+            //    alpaka::createStaticDevMemView(&ModelViewMatrix, myself->acc, modelviewDeviceExtent));
+
+            HIP_CHECK(hipGetSymbolAddress((void**) &symbolAddress, HIP_SYMBOL(ModelViewMatrix)));
+            auto modelviewDeviceView
+                = alpaka::ViewPlainPtr<DevAcc, isaac_mat4, alpaka::DimInt<1u>, ISAAC_IDX_TYPE>((isaac_mat4*)symbolAddress, myself->acc, modelviewDeviceExtent);
+
             // copy to constant memory
             alpaka::memcpy(myself->stream, modelviewDeviceView, modelviewHostBuf, ISAAC_IDX_TYPE(1));
 
@@ -1857,13 +1900,22 @@ namespace isaac
             // projection matrix
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const projectionDeviceExtent(ISAAC_IDX_TYPE(1));
             // get view
-            auto projectionDeviceView(
-                alpaka::createStaticDevMemView(&ProjectionMatrix, myself->acc, projectionDeviceExtent));
+            //auto projectionDeviceView(
+            //    alpaka::createStaticDevMemView(&ProjectionMatrix, myself->acc, projectionDeviceExtent));
+            HIP_CHECK(hipGetSymbolAddress((void**) &symbolAddress, HIP_SYMBOL(ProjectionMatrix)));
+            auto projectionDeviceView
+                = alpaka::ViewPlainPtr<DevAcc, isaac_mat4, alpaka::DimInt<1u>, ISAAC_IDX_TYPE>((isaac_mat4*)symbolAddress, myself->acc, projectionDeviceExtent);
+
             // copy to constant memory
             alpaka::memcpy(myself->stream, projectionDeviceView, projectionHostBuf, ISAAC_IDX_TYPE(1));
 
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const sizeDeviceExtent(ISAAC_IDX_TYPE(1));
-            auto sizeDeviceView(alpaka::createStaticDevMemView(&SimulationSize, myself->acc, sizeDeviceExtent));
+            //auto sizeDeviceView(alpaka::createStaticDevMemView(&SimulationSize, myself->acc, sizeDeviceExtent));
+
+            HIP_CHECK(hipGetSymbolAddress((void**) &symbolAddress, HIP_SYMBOL(SimulationSize)));
+            auto sizeDeviceView
+                = alpaka::ViewPlainPtr<DevAcc, SimulationSizeStruct, alpaka::DimInt<1u>, ISAAC_IDX_TYPE>((SimulationSizeStruct*)symbolAddress, myself->acc, sizeDeviceExtent);
+
             alpaka::memcpy(myself->stream, sizeDeviceView, sizeHostBuf, ISAAC_IDX_TYPE(1));
 
             // get pixel pointer from image as unsigned byte
@@ -1888,6 +1940,8 @@ namespace isaac
                    ISAAC_IDX_TYPE((readbackViewport[3] + blockSize.y - 1) / blockSize.y)};
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
             if(boost::mpl::not_<boost::is_same<T_Acc, alpaka::AccGpuCudaRt<T_AccDim, ISAAC_IDX_TYPE>>>::value)
+#elif ALPAKA_ACC_GPU_HIP_ENABLED == 1
+            if(boost::mpl::not_<boost::is_same<T_Acc, alpaka::AccGpuHipRt<T_AccDim, ISAAC_IDX_TYPE>>>::value)
 #endif
             {
                 gridSize.x = ISAAC_IDX_TYPE(readbackViewport[2]);
