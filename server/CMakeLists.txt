@@ -52,33 +52,6 @@ if (ISAAC_SDL)
 	set(HDRS ${HDRS} ${CMAKE_SOURCE_DIR}/src/SDLImageConnector.hpp)
 endif (ISAAC_SDL)
 
-find_package (PkgConfig REQUIRED)
-
-set(GST_INITIAL_OPTION OFF)
-pkg_search_module(GST gstreamer-1.0)
-if (GST_FOUND)
-	set(GST_INITIAL_OPTION ON)
-endif(GST_FOUND)
-
-option(ISAAC_GST "Use Gstreamer" ${GST_INITIAL_OPTION})
-if (ISAAC_GST)
-	pkg_search_module(GST REQUIRED gstreamer-1.0)
-	set(LIBS ${LIBS} ${GST_LIBRARIES} )
-	set(INCLUDE ${INCLUDE} ${GST_INCLUDE_DIRS})
-
-	pkg_search_module(GST_APP REQUIRED gstreamer-app-1.0)
-	set(LIBS ${LIBS} ${GST_APP_LIBRARIES})
-	set(INCLUDE ${INCLUDE} ${GST_APP_INCLUDE_DIRS})
-
-	set(SRCS ${SRCS} ${CMAKE_SOURCE_DIR}/src/RTPImageConnector.cpp)
-	set(SRCS ${SRCS} ${CMAKE_SOURCE_DIR}/src/RTMPImageConnector.cpp)
-	set(HDRS ${HDRS} ${CMAKE_SOURCE_DIR}/src/RTPImageConnector.hpp)
-	set(HDRS ${HDRS} ${CMAKE_SOURCE_DIR}/src/RTMPImageConnector.hpp)
-
-	add_definitions(-DISAAC_GST)
-endif (ISAAC_GST)
-
-
 
 set(ISAAC_MAX_RECEIVE "8388608" CACHE STRING "The size of the reserved buffers for sending and receiving, default of 8 MB should work for up to 4K" )
 set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_MAX_RECEIVE=${ISAAC_MAX_RECEIVE})
