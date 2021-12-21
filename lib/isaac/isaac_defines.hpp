@@ -53,7 +53,7 @@
 #define ISAAC_Z_NEAR 0.002f
 #define ISAAC_Z_FAR 100.0f
 
-#ifdef __CUDACC__
+#if(BOOST_LANG_CUDA || BOOST_LANG_HIP)
 #    define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_HOST_ACC __forceinline__
 #else
 #    define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_HOST_ACC inline
@@ -64,7 +64,7 @@
 
 #define ISAAC_DEVICE_INLINE ISAAC_HOST_DEVICE_INLINE
 
-#ifdef __CUDACC__
+#if(BOOST_LANG_CUDA || BOOST_LANG_HIP)
 #    define ISAAC_DEVICE __device__ __host__
 #else
 #    define ISAAC_DEVICE
@@ -76,9 +76,9 @@
 #    define ISAAC_NO_HOST_DEVICE_WARNING
 #endif
 
-#define ISAAC_CONSTANT ALPAKA_STATIC_ACC_MEM_CONSTANT
+#define ISAAC_CONSTANT __device__
 
-#ifdef __CUDACC__
+#if(BOOST_LANG_CUDA || BOOST_LANG_HIP)
 #    define ISAAC_MAX max
 #    define ISAAC_MIN min
 #else
