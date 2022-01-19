@@ -1882,6 +1882,8 @@ namespace isaac
                 ISAAC_START_TIME_MEASUREMENT(advectionBorder, getTicksUs())
 
                 // if border advection over mpi is enabled iterate over all sources
+		// disable advection syncronization because we have MPI_Waitall issues on spock
+		updateAdvection = false;
                 if(updateAdvection && updateAdvectionBorderMPI)
                 {
                     for(isaac_uint j = 0; j < fSourceListSize; ++j)
